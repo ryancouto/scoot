@@ -24,7 +24,7 @@ type SwarmTest struct {
 
 func (s *SwarmTest) InitOptions(defaults map[string]interface{}) error {
 	d := map[string]interface{}{
-		"logdir":      "/tmp/scoot-swarmtest",
+		"logdir":      "$TMPDIR/scoot-swarmtest",
 		"repo":        "$GOPATH/src/github.com/scootdev/scoot",
 		"num_workers": 5,
 	}
@@ -100,7 +100,7 @@ func (s *SwarmTest) SetupLog(logDir string) error {
 		if err := os.MkdirAll(logDir, 0777); err != nil {
 			return fmt.Errorf("Could not create log dir: %v", logDir)
 		}
-		logpath := path.Join(logDir, "swarmtest"+strconv.Itoa(os.Getpid()))
+		logpath := path.Join(os.ExpandEnv(logDir), "swarmtest"+strconv.Itoa(os.Getpid()))
 		out, err := os.Create(logpath)
 		if err != nil {
 			return fmt.Errorf("Could not init logfile: %v", logpath)

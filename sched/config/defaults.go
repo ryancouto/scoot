@@ -6,6 +6,7 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/scootdev/scoot/cloud/cluster"
+	clusterlocal "github.com/scootdev/scoot/cloud/cluster/local"
 	clusterimpl "github.com/scootdev/scoot/cloud/cluster/memory"
 	"github.com/scootdev/scoot/common/endpoints"
 	"github.com/scootdev/scoot/common/stats"
@@ -22,6 +23,7 @@ func DefaultParser() *Parser {
 		Cluster: map[string]ClusterConfig{
 			"memory": &ClusterMemoryConfig{},
 			"static": &ClusterStaticConfig{},
+			"local":  &clusterlocal.ClusterLocalConfig{},
 			"":       &ClusterMemoryConfig{Type: "memory", Count: 10},
 		},
 		Queue: map[string]QueueConfig{
