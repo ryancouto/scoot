@@ -60,23 +60,25 @@ func (c *getStatusCmd) run(cl *simpleCLIClient, cmd *cobra.Command, args []strin
 }
 
 func (c *getStatusCmd) saveStdOutAndErr(runStatus *scoot.RunStatus) {
-	runID, out, err := runStatus.GetRunId(), runStatus.GetOutUri(), runStatus.GetErrUri()
+	runID, stdOut, stdErr := runStatus.GetRunId(), runStatus.GetOutUri(), runStatus.GetErrUri()
 	if _, err := os.Stat("~/scoot-std"); os.IsNotExist(err) {
 		os.Mkdir("~/scoot-std", 0777)
 		log.Println("making scoot-std")
+		log.Println(err)
 	} else {
 		log.Println("not making scoot-std")
+		log.Println(err)
 	}
-	log.Println(err)
-	if _, err2 := os.Stat("~/scoot-std/" + runID); os.IsNotExist(err2) {
+	if _, err := os.Stat("~/scoot-std/" + runID); os.IsNotExist(err) {
 		os.Mkdir("~/scoot-std/"+runID, 0777)
 		log.Println("making scoot-std/" + runID)
+		log.Println(err)
 	} else {
 		log.Println("not making scoot-std/" + runID)
+		log.Println(err)
 	}
-	log.Println(err2)
-	c.saveStdStream(out, runID)
-	c.saveStdStream(err, runID)
+	c.saveStdStream(stdOut, runID)
+	c.saveStdStream(stdErr, runID)
 }
 
 func (c *getStatusCmd) saveStdStream(uri, runID string) {
