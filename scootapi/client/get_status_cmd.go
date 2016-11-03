@@ -80,7 +80,7 @@ func (c *getStatusCmd) saveStdStream(uri, dir string) {
 	case "file":
 		c.scpFile(hierPart, dir)
 	default:
-		log.Fatal("Error resolving URI protocol")
+		log.Fatal("Error resolving URI scheme")
 	}
 }
 
