@@ -86,7 +86,7 @@ func (c *getStatusCmd) saveStdStream(uri, runID string) {
 func (c *getStatusCmd) scpFile(hierPart, runID string) {
 	re := regexp.MustCompile("([^://?#]*)?")
 	authority := re.FindString(hierPart)
-	filePath := strings.Split(authority, hierPart)[1]
+	filePath := strings.Split(hierPart, authority)[1]
 	scp := exec.Command("scp", authority+":"+filePath, "~/scoot-std/"+runID+"/")
 	err := scp.Run()
 	if err != nil {
