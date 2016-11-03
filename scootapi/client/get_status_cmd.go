@@ -63,9 +63,8 @@ func (c *getStatusCmd) run(cl *simpleCLIClient, cmd *cobra.Command, args []strin
 
 func (c *getStatusCmd) saveStdOutAndErr(runStatus *scoot.RunStatus) {
 	runID, stdOut, stdErr := runStatus.GetRunId(), runStatus.GetOutUri(), runStatus.GetErrUri()
-	homeDir := os.Getenv("HOME")
 	runDir := fmt.Sprintf(runID+"_%s", strings.Replace(time.Now().String(), " ", "_", -1))
-	dir := filepath.Join(homeDir, "scoot-std", runDir)
+	dir := filepath.Join(os.Getenv("HOME"), "scoot-std", runDir)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		err = os.MkdirAll(dir, 0777)
 	}
@@ -89,12 +88,9 @@ func (c *getStatusCmd) scpFile(hierPart, dir string) {
 	re := regexp.MustCompile("([^://?#]*)?")
 	authority := re.FindString(hierPart)
 	filePath := strings.Split(hierPart, authority)[1]
-	scp := exec.Command("scp", "-v", authority+":"+filePath, dir)
+	scp := exec.Command("scp", authority+":"+filePath, dir)
 	err := scp.Run()
 	if err != nil {
-		log.Println("hier: ", hierPart)
-		log.Println("auth: ", authority)
-		log.Println("filepath: ", filePath)
 		log.Fatal("Error securely copying file: ", err)
 	}
 }
