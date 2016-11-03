@@ -63,36 +63,33 @@ func (c *getStatusCmd) run(cl *simpleCLIClient, cmd *cobra.Command, args []strin
 
 func (c *getStatusCmd) saveStdOutAndErr(runStatus *scoot.RunStatus) {
 	runID, stdOut, stdErr := runStatus.GetRunId(), runStatus.GetOutUri(), runStatus.GetErrUri()
-	dir := fmt.Sprintf(runID+"_%s.", strings.Replace(time.Now().String(), " ", "_", -1))
-	if _, err := os.Stat(filepath.Join("~", "scoot-std", dir)); os.IsNotExist(err) {
-		err = os.MkdirAll("~/scoot-std/"+runID, 0777)
-		log.Println("making", dir)
-		log.Println(err)
-	} else {
-		log.Println("not making" + dir)
-		log.Println(err)
+	homeDir := os.Getenv("HOME")
+	runDir := fmt.Sprintf(runID+"_%s.", strings.Replace(time.Now().String(), " ", "_", -1))
+	dir := filepath.Join(homeDir, "scoot-std", dir)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		err = os.MkdirAll(dir), 0777)
 	}
-	c.saveStdStream(stdOut, runID)
-	c.saveStdStream(stdErr, runID)
+	c.saveStdStream(stdOut, dir)
+	c.saveStdStream(stdErr, dir)
 }
 
-func (c *getStatusCmd) saveStdStream(uri, runID string) {
+func (c *getStatusCmd) saveStdStream(uri, dir string) {
 	uriSlice := strings.Split(uri, "://")
 	scheme := uriSlice[0]
 	hierPart := uriSlice[1]
 	switch scheme {
 	case "file":
-		c.scpFile(hierPart, runID)
+		c.scpFile(hierPart, dir)
 	default:
 		log.Fatal("Error resolving URI protocol")
 	}
 }
 
-func (c *getStatusCmd) scpFile(hierPart, runID string) {
+func (c *getStatusCmd) scpFile(hierPart, dir string) {
 	re := regexp.MustCompile("([^://?#]*)?")
 	authority := re.FindString(hierPart)
 	filePath := strings.Split(hierPart, authority)[1]
-	scp := exec.Command("scp", "-v", authority+":"+filePath, "~/scoot-std/"+runID+"/")
+	scp := exec.Command("scp", "-v", authority+":"+filePath, dir)
 	err := scp.Run()
 	if err != nil {
 		log.Println("hier: ", hierPart)
