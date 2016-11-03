@@ -6,8 +6,10 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/scootdev/scoot/scootapi/gen-go/scoot"
 	"github.com/spf13/cobra"
@@ -61,20 +63,13 @@ func (c *getStatusCmd) run(cl *simpleCLIClient, cmd *cobra.Command, args []strin
 
 func (c *getStatusCmd) saveStdOutAndErr(runStatus *scoot.RunStatus) {
 	runID, stdOut, stdErr := runStatus.GetRunId(), runStatus.GetOutUri(), runStatus.GetErrUri()
-	if _, err := os.Stat("~/scoot-std"); os.IsNotExist(err) {
-		os.Mkdir("~/scoot-std", 0777)
-		log.Println("making scoot-std")
+	dir := fmt.Sprintf(runID+"_%s.", strings.Replace(time.Now().String(), " ", "_", -1))
+	if _, err := os.Stat(filepath.Join("~", "scoot-std", dir)); os.IsNotExist(err) {
+		os.MkdirAll("~/scoot-std/"+runID, 0777)
+		log.Println("making", dir)
 		log.Println(err)
 	} else {
-		log.Println("not making scoot-std")
-		log.Println(err)
-	}
-	if _, err := os.Stat("~/scoot-std/" + runID); os.IsNotExist(err) {
-		os.Mkdir("~/scoot-std/"+runID, 0777)
-		log.Println("making scoot-std/" + runID)
-		log.Println(err)
-	} else {
-		log.Println("not making scoot-std/" + runID)
+		log.Println("not making" + dir)
 		log.Println(err)
 	}
 	c.saveStdStream(stdOut, runID)
