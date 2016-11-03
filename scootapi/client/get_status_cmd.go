@@ -65,9 +65,9 @@ func (c *getStatusCmd) saveStdOutAndErr(runStatus *scoot.RunStatus) {
 	runID, stdOut, stdErr := runStatus.GetRunId(), runStatus.GetOutUri(), runStatus.GetErrUri()
 	homeDir := os.Getenv("HOME")
 	runDir := fmt.Sprintf(runID+"_%s.", strings.Replace(time.Now().String(), " ", "_", -1))
-	dir := filepath.Join(homeDir, "scoot-std", dir)
+	dir := filepath.Join(homeDir, "scoot-std", runDir)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		err = os.MkdirAll(dir), 0777)
+		err = os.MkdirAll(dir, 0777)
 	}
 	c.saveStdStream(stdOut, dir)
 	c.saveStdStream(stdErr, dir)
