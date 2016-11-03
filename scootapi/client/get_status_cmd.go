@@ -65,7 +65,7 @@ func (c *getStatusCmd) saveStdOutAndErr(runStatus *scoot.RunStatus) {
 	runID, stdOut, stdErr := runStatus.GetRunId(), runStatus.GetOutUri(), runStatus.GetErrUri()
 	dir := fmt.Sprintf(runID+"_%s.", strings.Replace(time.Now().String(), " ", "_", -1))
 	if _, err := os.Stat(filepath.Join("~", "scoot-std", dir)); os.IsNotExist(err) {
-		os.MkdirAll("~/scoot-std/"+runID, 0777)
+		err = os.MkdirAll("~/scoot-std/"+runID, 0777)
 		log.Println("making", dir)
 		log.Println(err)
 	} else {
