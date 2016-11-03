@@ -65,7 +65,7 @@ func (c *getStatusCmd) saveStdOutAndErr(runStatus *scoot.RunStatus) {
 		os.Mkdir("~/scoot-std", 0777)
 	}
 	if _, err2 := os.Stat("~/scoot-std/" + runID); os.IsNotExist(err2) {
-		os.Mkdir("~/scoot-std"+runID, 0777)
+		os.Mkdir("~/scoot-std/"+runID, 0777)
 	}
 	c.saveStdStream(out, runID)
 	c.saveStdStream(err, runID)
