@@ -87,9 +87,9 @@ func (c *getStatusCmd) scpFile(hierPart, runID string) {
 	re := regexp.MustCompile("([^://?#]*)?")
 	authority := re.FindString(hierPart)
 	filePath := strings.Split(hierPart, authority)[1]
-	scp := exec.Command("scp", authority+":"+filePath, "~/scoot-std/"+runID+"/")
+	scp := exec.Command("scp", authority+":"+filePath, "~/scoot-std/"+runID+"/", "-v")
 	err := scp.Run()
 	if err != nil {
-		log.Fatal("Error securely copying file: %v", err)
+		log.Fatal("Error securely copying file:", err)
 	}
 }
