@@ -90,9 +90,9 @@ func (c *getStatusCmd) scpFile(hierPart, runID string) {
 	scp := exec.Command("scp", "-v", authority+":"+filePath, "~/scoot-std/"+runID+"/")
 	err := scp.Run()
 	if err != nil {
+		log.Println("hier: ", hierPart)
+		log.Println("auth: ", authority)
+		log.Println("filepath: ", filePath)
 		log.Fatal("Error securely copying file: ", err)
-		log.Fatal("hier: ", hierPart)
-		log.Fatal("auth: ", authority)
-		log.Fatal("filepath: ", filePath)
 	}
 }
