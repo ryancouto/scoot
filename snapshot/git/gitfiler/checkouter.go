@@ -37,7 +37,7 @@ func (c *Checkouter) Checkout(id string) (co snapshot.Checkout, err error) {
 		}
 	}()
 
-	// TODO(dbentley): do more ot validate id. E.g., don't let "HEAD" or "master" slip through
+	// TODO(dbentley): do more to validate id. E.g., don't let "HEAD" or "master" slip through
 	if id == "" {
 		id = DEFAULT_REV
 	}
