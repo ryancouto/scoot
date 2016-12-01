@@ -44,17 +44,18 @@ go run ./binaries/scootapi/main.go run_smoke_test
 ```
 
 ## Scoot Thrift Code
-(open source scoot code is in workspace/github.com/scootdev/scoot)
 
 __Generating thrift files (scootapi used as an example)__
-* To Generate files run from scoot's scootapi directory:
+* To Generate scootapi files (from workspace/github.com/scootdev/scoot/scootapi):
+:
 ```sh
 thrift --gen go:package_prefix=github.com/scootdev/scoot/scootapi/gen-go/,package=scoot,thrift_import=github.com/apache/thrift/lib/go/thrift scoot.thrift
 ```
+(Thrift files can be found in scootapi and sched/job_def.)
 
 ## Scoot Protobuf Code
 __Generating go protobuf files (for local Scoot Daemon)__
-cd to scoot's daemon/protocol
+* To Generate files for Scoot's daemon (from workspace/github.com/scootdev/scoot/daemon/protocol):
 
 protoc -I . daemon.proto --go_out=plugins=grpc:.
 
@@ -95,14 +96,19 @@ pip install grpcio-tools
 pip install docopt==0.6.2
 ```
 
-## Install/Access Scoot Executables and libraries
+## Install/Access Scoot Executables and Libraries
 ### Scoot Local Daemon, Local Scheduler and Local Worker
-*cd to scoot directory (workspace/github.com/scootdev/scoot)
-*run: go install ./binaries/...
-** the binaries will be installed in workspace/bin
+* cd to scoot directory (workspace/github.com/scootdev/scoot)
+* run: 
+```sh
+$go install ./binaries/...
+```
+  * the binaries will be installed in workspace/bin
 
 ### Scoot Local Daemon Command Line Client
-```python workspace/github.com/scootdev/scoot/daemon/protocol/python/scoot/scoot.py
+```sh
+python workspace/github.com/scootdev/scoot/daemon/protocol/python/scoot/scoot.py
+```
 
 ### Python client library
 Can be found at workspace/github.com/scootdev/scoot/daemon/protocol/python/scoot/client_lib.py
