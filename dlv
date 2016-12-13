@@ -1,0 +1,9 @@
+#!/bin/bash
+if [ "$6" == "test" ] ; then
+  echo "Debugging the unit test with the delve debugger"
+  go test -c -o $4 -gcflags "-N -l" $7
+  $HOME/bin/dlv $1 $2 exec $4 -- --test.v
+else
+  echo "Debugging the test with the delve debugger"
+  $HOME/bin/dlv $*
+fi
