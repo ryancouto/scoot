@@ -4,6 +4,7 @@
 package repo
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"os/exec"
@@ -20,16 +21,30 @@ func (r *Repository) Dir() string {
 	return r.dir
 }
 
+func (r *Repository) RunErr(args ...string) (stdout string, stderr string, err error) {
+	cmd := exec.Command("git", args...)
+	stderrBuf := bytes.NewBuffer(nil)
+	cmd.Stderr = stderrBuf
+	stdout, err = r.runCmd(cmd)
+	return stdout, stderrBuf.String(), err
+}
+
 // Run a git command in r
 func (r *Repository) Run(args ...string) (string, error) {
-	log.Println("repo.Repository.Run", args)
 	cmd := exec.Command("git", args...)
+	return r.runCmd(cmd)
+}
+
+func (r *Repository) runCmd(cmd *exec.Cmd) (string, error) {
 	cmd.Dir = r.dir
+	log.Println("repo.Repository.Run", cmd.Args)
 	data, err := cmd.Output()
 	log.Println("repo.Repository.Run complete", err)
-	// Print stderr, which exists only in go 1.6 and later.
 	if err != nil {
-		log.Println("repo.Repository.Run error:", string(err.(*exec.ExitError).Stderr))
+		err, ok := err.(*exec.ExitError)
+		if ok && len(err.Stderr) > 0 {
+			log.Println("repo.Repository.Run error:", string(err.Stderr))
+		}
 	}
 	return string(data), err
 }
