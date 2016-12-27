@@ -9,11 +9,18 @@ import (
 	"github.com/scootdev/scoot/snapshot/git/repo"
 )
 
+// DBInjector
 type DBInjector interface {
+
+	// Register registeres any necessary flags on the root command
 	Register(rootCmd *cobra.Command)
+
+	// Inject injects the DB that is necessary for all commands
+	// TODO(dbentley): change this to be a snapshot.DB
 	Inject() (*gitdb.DB, error)
 }
 
+// MakeSnapsCLI makes the CLI for the Snaps tool.
 func MakeSnapsCLI(injector DBInjector) *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "snaps",
@@ -57,7 +64,10 @@ func MakeSnapsCLI(injector DBInjector) *cobra.Command {
 }
 
 type dbCommand interface {
+	// register registers any local flags, returning the command
 	register() *cobra.Command
+
+	// run runs the command with the provided DB
 	run(db *gitdb.DB, cmd *cobra.Command, args []string) error
 }
 

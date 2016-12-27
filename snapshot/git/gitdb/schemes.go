@@ -12,7 +12,7 @@ func (db *DB) ParseID(id string) (SnapID, error) {
 }
 
 type SnapID interface {
-	ID() string
+	snapshot.SnapID
 	localSHA() string
 }
 
