@@ -15,6 +15,7 @@
     "RecoverJobsOnStartup" : false
   },
   "SagaLog": {
-    "Type": "memory"
+    "Type": "file",
+    "Directory": "sagalog"
   }
 }

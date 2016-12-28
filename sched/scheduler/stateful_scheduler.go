@@ -144,6 +144,8 @@ func (s *statefulScheduler) ScheduleJob(jobDef sched.JobDefinition) (string, err
 		return "", err
 	}
 
+	log.Println("Serialized Job: %v", asBytes)
+
 	// Log StartSaga Message
 	sagaObj, err := s.sagaCoord.MakeSaga(job.Id, asBytes)
 	if err != nil {
