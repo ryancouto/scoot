@@ -26,6 +26,8 @@ func (c *StatefulSchedulerConfig) Install(bag *ice.MagicBag) {
 
 func (c *StatefulSchedulerConfig) Create() scheduler.SchedulerConfig {
 	return scheduler.SchedulerConfig{
-		MaxRetriesPerTask: c.MaxRetriesPerTask,
+		MaxRetriesPerTask:    c.MaxRetriesPerTask,
+		DebugMode:            c.DebugMode,
+		RecoverJobsOnStartup: c.RecoverJobsOnStartup,
 	}
 }
