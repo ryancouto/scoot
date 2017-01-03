@@ -103,16 +103,21 @@ func NewStatefulScheduler(
 		stat:              stat,
 	}
 
-	// TODO: we need to allow the scheduler to accept new jobs
-	// while recovering old ones.
-	if config.RecoverJobsOnStartup {
-		sched.startUp()
-	}
+	log.Printf("INFO: Creating Scheduler, Debug Mode %v, Recover Active Sagas %v",
+		config.DebugMode, config.RecoverJobsOnStartup)
 
 	if !config.DebugMode {
 		// start the scheduler loop
 		go func() {
 			sched.loop()
+		}()
+	}
+
+	// TODO: we need to allow the scheduler to accept new jobs
+	// while recovering old ones.
+	if config.RecoverJobsOnStartup {
+		go func() {
+			sched.startUp()
 		}()
 	}
 
@@ -143,6 +148,8 @@ func (s *statefulScheduler) ScheduleJob(jobDef sched.JobDefinition) (string, err
 	if err != nil {
 		return "", err
 	}
+
+	log.Println("Serialized Job: %v", asBytes)
 
 	// Log StartSaga Message
 	sagaObj, err := s.sagaCoord.MakeSaga(job.Id, asBytes)
