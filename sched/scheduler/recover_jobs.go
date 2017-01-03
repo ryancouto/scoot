@@ -14,6 +14,7 @@ import (
 // ActiveSagas are recovered in parallel and are added to the addJobCh to be rescheduled
 // This method returns once all activeSagas have been successfully recovered.
 func recoverJobs(sc saga.SagaCoordinator, addJobCh chan jobAddedMsg) {
+	log.Printf("INFO: Recovering Sagas")
 
 	recoveryActiveSagaAttempts := 0
 	activeSagas, err := sc.Startup()
@@ -33,6 +34,8 @@ func recoverJobs(sc saga.SagaCoordinator, addJobCh chan jobAddedMsg) {
 	if activeSagas == nil {
 		return
 	}
+
+	log.Printf("INFO: Recovering Active Sagas %+v", activeSagas)
 
 	var wg sync.WaitGroup
 	wg.Add(len(activeSagas))

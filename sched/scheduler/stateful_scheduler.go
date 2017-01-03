@@ -105,6 +105,9 @@ func NewStatefulScheduler(
 
 	// TODO: we need to allow the scheduler to accept new jobs
 	// while recovering old ones.
+	log.Printf("INFO: Creating Scheduler, Debug Mode %v, Recover Active Sagas %v",
+		config.DebugMode, config.RecoverJobsOnStartup)
+
 	if config.RecoverJobsOnStartup {
 		sched.startUp()
 	}
