@@ -35,7 +35,7 @@ func recoverJobs(sc saga.SagaCoordinator, addJobCh chan jobAddedMsg) {
 		return
 	}
 
-	log.Printf("INFO: Recovering Active Sagas %+v", activeSagas)
+	log.Printf("DEBUG: Recovering Active Sagas %+v", activeSagas)
 
 	var wg sync.WaitGroup
 	wg.Add(len(activeSagas))
@@ -106,7 +106,7 @@ func recoverSaga(sc saga.SagaCoordinator, sagaId string) *saga.Saga {
 	// This could happen because a Saga got added to active index, but failed to
 	// log successfully.  In this case Starting the Saga will have failed.
 	if activeSaga == nil {
-		log.Printf("INFO: Saga doesn't exist %v", sagaId)
+		log.Printf("DEBUG: Saga doesn't exist %v", sagaId)
 		return nil
 	}
 
@@ -114,7 +114,7 @@ func recoverSaga(sc saga.SagaCoordinator, sagaId string) *saga.Saga {
 	// This could happen because Active Index did not get updated successfully,
 	// even if the saga has been completed.
 	if activeSaga.GetState().IsSagaCompleted() {
-		log.Printf("INFO: Saga Already Completed %v", sagaId)
+		log.Printf("DEBUG: Saga Already Completed %v", sagaId)
 		return nil
 	}
 
