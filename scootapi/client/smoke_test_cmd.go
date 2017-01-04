@@ -88,9 +88,13 @@ func (r *smokeTestRunner) waitForJobs(jobs map[string]*scoot.JobStatus, timeout 
 		done := true
 		for k, _ := range jobs {
 			d, err := r.updateJobStatus(k, jobs)
+
+			// if there is an error just continue
 			if err != nil {
-				return err
+				log.Printf("Error: Updating Job Status ID: %v will retry later, Error: %v", k, err)
+				d = false
 			}
+
 			done = done && d
 		}
 		if done {
@@ -135,6 +139,8 @@ func (r *smokeTestRunner) updateJobStatus(jobId string, jobs map[string]*scoot.J
 	}
 	status, err = r.cl.scootClient.GetStatus(jobId)
 	if err != nil {
+		// reset scoot client connection
+		r.cl.Reset()
 		return true, err
 	}
 	jobs[jobId] = status
