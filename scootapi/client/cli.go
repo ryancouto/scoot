@@ -2,7 +2,7 @@ package client
 
 import (
 	"fmt"
-	"log"
+	//"log"
 
 	"github.com/scootdev/scoot/common/dialer"
 	"github.com/scootdev/scoot/scootapi"
@@ -64,7 +64,7 @@ func (c *simpleCLIClient) createScootClient() error {
 		if c.addr == "" {
 			return fmt.Errorf("scootapi cli addr unset and no valued in %s", scootapi.GetScootapiAddrPath())
 		}
-		log.Printf("scootapi cli: using addr %v (from %v)", c.addr, scootapi.GetScootapiAddrPath())
+		//log.Printf("scootapi cli: using addr %v (from %v)", c.addr, scootapi.GetScootapiAddrPath())
 	}
 
 	transport, protocolFactory, err := c.dialer.Dial(c.addr)
