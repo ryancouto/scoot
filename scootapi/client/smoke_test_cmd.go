@@ -137,6 +137,7 @@ func printJobs(jobs map[string]*scoot.JobStatus) {
 func (r *smokeTestRunner) updateJobStatus(jobId string, jobs map[string]*scoot.JobStatus) (bool, error) {
 	err := r.cl.Dial()
 	if err != nil {
+		log.Printf("Error Dialing %v", err)
 		return true, err
 	}
 
