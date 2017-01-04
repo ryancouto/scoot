@@ -139,8 +139,6 @@ func (r *smokeTestRunner) updateJobStatus(jobId string, jobs map[string]*scoot.J
 	}
 	status, err = r.cl.scootClient.GetStatus(jobId)
 	if err != nil {
-		// reset scoot client connection
-		r.cl.Reset()
 		return true, err
 	}
 	jobs[jobId] = status

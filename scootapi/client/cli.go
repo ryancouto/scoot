@@ -49,15 +49,8 @@ func NewSimpleCLIClient(d dialer.Dialer) (CLIClient, error) {
 }
 
 func (c *simpleCLIClient) Dial() error {
-	var err error
-	if c.scootClient == nil {
-		err = c.createScootClient()
-	}
-	return err
-}
-
-// resets scootClients connection by creating a new *scoot.CloudScootClient to use when Dialing
-func (c *simpleCLIClient) Reset() error {
+	// Always recreate a connection.  This way if something went wrong with
+	// the previous connection we don't have a clean one.
 	return c.createScootClient()
 }
 
