@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"net/http"
 	"time"
 

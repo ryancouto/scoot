@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/scootdev/scoot/scootapi/gen-go/scoot"
 	"github.com/spf13/cobra"
-	"log"
+	log "github.com/Sirupsen/logrus"
 )
 
 type getStatusCmd struct {

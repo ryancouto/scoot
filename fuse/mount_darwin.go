@@ -3,7 +3,7 @@ package fuse
 import (
 	"errors"
 	"fmt"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"os"
 	"os/exec"
 	"path"

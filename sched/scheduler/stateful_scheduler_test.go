@@ -3,7 +3,7 @@ package scheduler
 import (
 	"errors"
 	"fmt"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"testing"
 	"time"
 

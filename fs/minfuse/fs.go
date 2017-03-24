@@ -2,7 +2,7 @@ package minfuse
 
 import (
 	"io"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"os"
 	"syscall"
 	"time"

@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"syscall"
 	"unsafe"
 )

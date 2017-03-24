@@ -2,7 +2,7 @@ package min
 
 import (
 	"fmt"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"runtime"
 	"time"
 

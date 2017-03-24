@@ -5,7 +5,7 @@ package repo
 
 import (
 	"fmt"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"os"
 	"os/exec"
 	"strings"

@@ -3,7 +3,7 @@
 package server
 
 import (
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"sync"
 	"time"
 

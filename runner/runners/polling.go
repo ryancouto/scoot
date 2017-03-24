@@ -5,7 +5,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/scootdev/scoot/runner"
-	"log"
+	log "github.com/Sirupsen/logrus"
 )
 
 // polling.go: turns a StatusQueryNower into a StatusQuerier by polling

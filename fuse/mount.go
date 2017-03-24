@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"io"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"sync"
 )
 

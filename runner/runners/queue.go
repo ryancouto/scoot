@@ -9,7 +9,7 @@ import (
 	"github.com/scootdev/scoot/runner"
 	"github.com/scootdev/scoot/runner/execer"
 	"github.com/scootdev/scoot/snapshot"
-	"log"
+	log "github.com/Sirupsen/logrus"
 )
 
 const QueueFullMsg = "No resources available. Please try later."

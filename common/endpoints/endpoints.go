@@ -6,7 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"net/http"
 	"time"
 

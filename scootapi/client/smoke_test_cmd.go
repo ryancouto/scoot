@@ -12,7 +12,7 @@ import (
 	"github.com/scootdev/scoot/scootapi/gen-go/scoot"
 	"github.com/scootdev/scoot/tests/testhelpers"
 	"github.com/spf13/cobra"
-	"log"
+	log "github.com/Sirupsen/logrus"
 )
 
 type smokeTestCmd struct {

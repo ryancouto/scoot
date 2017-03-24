@@ -8,7 +8,7 @@ import (
 	"github.com/scootdev/scoot/scootapi/gen-go/scoot"
 	"github.com/spf13/cobra"
 	"io/ioutil"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"os"
 )
 

@@ -2,7 +2,7 @@ package fuse
 
 import (
 	"fmt"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"net"
 	"os"
 	"os/exec"

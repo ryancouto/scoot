@@ -4,7 +4,7 @@ package main
 
 import (
 	"flag"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -38,7 +38,7 @@ var storeHandle = flag.String("bundlestore", "", "Abs file path or an http 'host
 func main() {
 	flag.Parse()
 
-	log.SetFlags(log.LstdFlags | log.LUTC | log.Lshortfile)
+	// log.SetFlags(log.LstdFlags | log.LUTC | log.Lshortfile)
 
 	configText, err := jsonconfig.GetConfigText(*configFlag, config.Asset)
 	if err != nil {

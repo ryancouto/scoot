@@ -1,7 +1,7 @@
 package setup
 
 import (
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"strconv"
 	"strings"
 

@@ -3,7 +3,7 @@ package runners
 import (
 	"fmt"
 	"io"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"os"
 	"path/filepath"
 	"time"

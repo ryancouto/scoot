@@ -1,7 +1,7 @@
 package server
 
 import (
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"

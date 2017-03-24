@@ -3,7 +3,7 @@ package minfuse
 import (
 	"errors"
 	"flag"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"net/http"
 	"os"
 	"os/signal"
@@ -29,7 +29,7 @@ type Options struct {
 }
 
 func SetupLog() {
-	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+	// log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 }
 
 func InitFlags() (*Options, error) {

@@ -1,7 +1,7 @@
 package client
 
 import (
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"time"
 
 	"github.com/scootdev/scoot/runner"

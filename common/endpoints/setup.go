@@ -1,7 +1,7 @@
 package endpoints
 
 import (
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"net/http"
 	"time"
 

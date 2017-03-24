@@ -2,7 +2,7 @@ package setup
 
 import (
 	"fmt"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"os"
 	"os/exec"
 	"os/signal"

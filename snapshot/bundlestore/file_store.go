@@ -3,7 +3,7 @@ package bundlestore
 import (
 	"errors"
 	"io"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"os"
 	"path/filepath"
 	"strings"

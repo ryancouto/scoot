@@ -2,7 +2,7 @@ package scheduler
 
 import (
 	"github.com/scootdev/scoot/cloud/cluster"
-	"log"
+	log "github.com/Sirupsen/logrus"
 )
 
 const noTask = ""

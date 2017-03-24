@@ -4,7 +4,7 @@ package main
 
 import (
 	"flag"
-	"log"
+	log "github.com/Sirupsen/logrus"
 
 	"github.com/apache/thrift/lib/go/thrift"
 
@@ -26,7 +26,7 @@ var configFlag = flag.String("config", "local.memory", "Scheduler Config (either
 func main() {
 	flag.Parse()
 
-	log.SetFlags(log.LstdFlags | log.LUTC | log.Lshortfile)
+	// log.SetFlags(log.LstdFlags | log.LUTC | log.Lshortfile)
 
 	configText, err := jsonconfig.GetConfigText(*configFlag, config.Asset)
 	if err != nil {

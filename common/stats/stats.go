@@ -18,7 +18,7 @@ package stats
 
 import (
 	"encoding/json"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"strings"
 	"time"
 

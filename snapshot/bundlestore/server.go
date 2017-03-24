@@ -3,7 +3,7 @@ package bundlestore
 import (
 	"fmt"
 	"io"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"net/http"
 	"regexp"
 	"strings"

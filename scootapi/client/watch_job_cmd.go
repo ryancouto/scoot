@@ -2,7 +2,7 @@ package client
 
 import (
 	"fmt"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"time"
 
 	"github.com/pkg/errors"

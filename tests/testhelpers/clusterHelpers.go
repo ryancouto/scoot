@@ -1,7 +1,7 @@
 package testhelpers
 
 import (
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"time"
 
 	"github.com/scootdev/scoot/os/temp"

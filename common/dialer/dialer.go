@@ -4,7 +4,7 @@ package dialer
 
 import (
 	"fmt"
-	"log"
+	log "github.com/Sirupsen/logrus"
 
 	"github.com/apache/thrift/lib/go/thrift"
 )

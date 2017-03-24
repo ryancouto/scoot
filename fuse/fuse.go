@@ -66,7 +66,7 @@ package fuse // import "github.com/scootdev/scoot/fuse"
 
 import (
 	"fmt"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"os"
 	"syscall"
 	"time"

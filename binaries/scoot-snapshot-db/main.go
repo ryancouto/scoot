@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.LUTC | log.Lshortfile)
+	// log.SetFlags(log.LstdFlags | log.LUTC | log.Lshortfile)
 
 	inj := &injector{}
 	cmd := cli.MakeDBCLI(inj)

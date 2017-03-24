@@ -7,7 +7,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/scootdev/scoot/runner"
-	"log"
+	log "github.com/Sirupsen/logrus"
 )
 
 // chaos.go: impl that introduces errors (for testing)

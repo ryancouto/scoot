@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"os"
 	"os/exec"
 	"path/filepath"

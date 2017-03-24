@@ -2,7 +2,7 @@ package snapshot
 
 import (
 	"io/ioutil"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"os"
 
 	"github.com/scootdev/scoot/fs/perf"
