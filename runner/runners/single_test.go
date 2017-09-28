@@ -8,16 +8,16 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 
-	"github.com/scootdev/scoot/common/log/hooks"
-	"github.com/scootdev/scoot/common/stats"
-	"github.com/scootdev/scoot/os/temp"
-	"github.com/scootdev/scoot/runner"
-	"github.com/scootdev/scoot/runner/execer"
-	"github.com/scootdev/scoot/runner/execer/execers"
-	os_execer "github.com/scootdev/scoot/runner/execer/os"
-	"github.com/scootdev/scoot/snapshot/snapshots"
+	"github.com/twitter/scoot/common/log/hooks"
+	"github.com/twitter/scoot/common/stats"
+	"github.com/twitter/scoot/os/temp"
+	"github.com/twitter/scoot/runner"
+	"github.com/twitter/scoot/runner/execer"
+	"github.com/twitter/scoot/runner/execer/execers"
+	os_execer "github.com/twitter/scoot/runner/execer/os"
+	"github.com/twitter/scoot/snapshot/snapshots"
 )
 
 func TestRun(t *testing.T) {
@@ -119,7 +119,7 @@ func TestMemCap(t *testing.T) {
 
 	query := runner.Query{
 		AllRuns: true,
-		States:  runner.MaskForState(runner.BADREQUEST),
+		States:  runner.MaskForState(runner.FAILED),
 	}
 	// Travis may be slow, wait a super long time? This may also be necessary due to slow debug output from os_execer? TBD.
 	if runs, _, err := r.Query(query, runner.Wait{Timeout: 5 * time.Second}); err != nil {
@@ -147,9 +147,12 @@ func TestStats(t *testing.T) {
 	}
 	// wait for the run to finish
 	status, svcStatus, err := r.Query(query, runner.Wait{Timeout: 5 * time.Second})
-	log.Infof("statusLen:%d", len(status))
-	log.Infof("svcStatus:%v", svcStatus)
-	log.Infof("err:%v:", err)
+	log.WithFields(
+		log.Fields{
+			"statusLen": len(status),
+			"svcStatus": svcStatus,
+			"err":       err,
+		}).Info("Received status")
 
 	if !stats.StatsOk("", statsReg, t,
 		map[string]stats.Rule{

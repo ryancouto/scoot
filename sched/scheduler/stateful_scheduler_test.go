@@ -7,20 +7,20 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/golang/mock/gomock"
-	"github.com/scootdev/scoot/cloud/cluster"
-	"github.com/scootdev/scoot/common/stats"
-	"github.com/scootdev/scoot/os/temp"
-	"github.com/scootdev/scoot/runner"
-	"github.com/scootdev/scoot/runner/execer/execers"
-	"github.com/scootdev/scoot/runner/runners"
-	"github.com/scootdev/scoot/saga"
-	"github.com/scootdev/scoot/saga/sagalogs"
-	"github.com/scootdev/scoot/sched"
-	"github.com/scootdev/scoot/sched/worker/workers"
-	"github.com/scootdev/scoot/snapshot/snapshots"
+	"github.com/twitter/scoot/cloud/cluster"
+	"github.com/twitter/scoot/common/stats"
+	"github.com/twitter/scoot/os/temp"
+	"github.com/twitter/scoot/runner"
+	"github.com/twitter/scoot/runner/execer/execers"
+	"github.com/twitter/scoot/runner/runners"
+	"github.com/twitter/scoot/saga"
+	"github.com/twitter/scoot/saga/sagalogs"
+	"github.com/twitter/scoot/sched"
+	"github.com/twitter/scoot/sched/worker/workers"
+	"github.com/twitter/scoot/snapshot/snapshots"
 )
 
 //Mocks sometimes hang without useful output, this allows early exit with err msg.
@@ -426,8 +426,10 @@ func Test_StatefulScheduler_KillFinishedJob(t *testing.T) {
 	}
 
 	// verify state changed appropriately
-	if s.clusterState.nodes["node1"].runningTask != noTask {
-		t.Errorf("Expected node1 to not have any running tasks")
+	for i := 0; i < 5; i++ {
+		if s.clusterState.nodes[cluster.NodeId(fmt.Sprintf("node%d", i+1))].runningTask != noTask {
+			t.Errorf("Expected nodes to not have any running tasks")
+		}
 	}
 
 	// advance scheduler until job gets marked completed
@@ -445,7 +447,7 @@ func Test_StatefulScheduler_KillFinishedJob(t *testing.T) {
 		}
 	} else {
 		j := s.getJob(jobId)
-		for j == nil {
+		for j != nil {
 			s.step()
 			j = s.getJob(jobId)
 		}
@@ -514,6 +516,27 @@ func Test_StatefulScheduler_KillNotStartedJob(t *testing.T) {
 
 	// cleanup
 	sendKillRequest(jobId1, s)
+}
+
+func Test_StatefulScheduler_NodeScaleFactor(t *testing.T) {
+	NodeScaleAdjustment = .5 // Setting this global setting explicitly for consistency.
+	s := &SchedulerConfig{SoftMaxSchedulableTasks: 1000}
+	numNodes := 20
+	numTasks := float32(1)
+	if n := ceil(numTasks * s.GetNodeScaleFactor(numNodes, 0)); n != 1 {
+		t.Errorf("Expected 1, got %d", n)
+	}
+
+	numTasks = float32(100)
+	if n := ceil(numTasks * s.GetNodeScaleFactor(numNodes, 0)); n != 2 {
+		t.Errorf("Expected 2, got %d", n)
+	}
+	if n := ceil(numTasks * s.GetNodeScaleFactor(numNodes, 1)); n != 3 {
+		t.Errorf("Expected 3, got %d", n)
+	}
+	if n := ceil(numTasks * s.GetNodeScaleFactor(numNodes, 2)); n != 4 {
+		t.Errorf("Expected 4, got %d", n)
+	}
 }
 
 func allTasksInState(jobName string, jobId string, s *statefulScheduler, status sched.Status) bool {

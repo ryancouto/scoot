@@ -7,19 +7,21 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/golang/mock/gomock"
-	"github.com/scootdev/scoot/cloud/cluster"
-	"github.com/scootdev/scoot/common/log/hooks"
-	"github.com/scootdev/scoot/common/stats"
-	"github.com/scootdev/scoot/os/temp"
-	"github.com/scootdev/scoot/runner"
-	runnermock "github.com/scootdev/scoot/runner/mocks"
-	"github.com/scootdev/scoot/runner/runners"
-	"github.com/scootdev/scoot/saga"
-	"github.com/scootdev/scoot/sched"
-	"github.com/scootdev/scoot/sched/worker/workers"
-	"github.com/scootdev/scoot/workerapi"
+	log "github.com/sirupsen/logrus"
+
+	"github.com/twitter/scoot/cloud/cluster"
+	"github.com/twitter/scoot/common/log/hooks"
+	"github.com/twitter/scoot/common/log/tags"
+	"github.com/twitter/scoot/common/stats"
+	"github.com/twitter/scoot/os/temp"
+	"github.com/twitter/scoot/runner"
+	runnermock "github.com/twitter/scoot/runner/mocks"
+	"github.com/twitter/scoot/runner/runners"
+	"github.com/twitter/scoot/saga"
+	"github.com/twitter/scoot/sched"
+	"github.com/twitter/scoot/sched/worker/workers"
+	"github.com/twitter/scoot/workerapi"
 )
 
 var tmp *temp.TempDir
@@ -43,9 +45,11 @@ func get_testTaskRunner(s *saga.Saga, r runner.Service, jobId, taskId string,
 		runnerRetryTimeout:    0,
 		runnerRetryInterval:   0,
 
-		jobId:  jobId,
-		taskId: taskId,
-		task:   task,
+		task: task,
+		LogTags: tags.LogTags{
+			JobID:  jobId,
+			TaskID: taskId,
+		},
 		nodeSt: &nodeState{node: cluster.NewIdNode(jobId + "." + taskId)},
 	}
 }
@@ -175,8 +179,7 @@ func Test_runTaskAndLog_MarkFailedTaskAsFinished(t *testing.T) {
 	var retStatus runner.RunStatus
 
 	retStatus.State = runner.FAILED
-	retStatus.Error = emptyStatusError("job1", "task1", testErr)
-	retStatus.ExitCode = DeadLetterExitCode
+	retStatus.Error = emptyStatusError("job1", "task1", testErr) + DeadLetterTrailer
 	expectedProcessStatus, _ := workerapi.SerializeProcessStatus(retStatus)
 	sagaLogMock.EXPECT().LogMessage(saga.MakeStartTaskMessage("job1", "task1", nil))
 	sagaLogMock.EXPECT().LogMessage(saga.MakeEndTaskMessage("job1", "task1", expectedProcessStatus))
@@ -274,7 +277,7 @@ func Test_runTaskWithQueryRetry(t *testing.T) {
 
 	runMock := runnermock.NewMockService(mockCtrl)
 	queryErr := errors.New("QueryErr")
-	runMock.EXPECT().Run(gomock.Any()).Return(runner.RunStatus{}, nil)
+	runMock.EXPECT().Run(gomock.Any()).Return(runner.RunStatus{State: runner.PENDING}, nil)
 	runMock.EXPECT().Query(gomock.Any(), gomock.Any()).Return(
 		[]runner.RunStatus{{}}, runner.ServiceStatus{}, queryErr).Times(2)
 	runMock.EXPECT().Abort(gomock.Any())

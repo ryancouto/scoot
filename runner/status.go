@@ -1,6 +1,10 @@
 package runner
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/twitter/scoot/common/log/tags"
+)
 
 type RunID string
 type RunState int
@@ -20,18 +24,18 @@ const (
 
 	// Succeeded or failed yielding an exit code. Only state with an exit code.
 	COMPLETE
-	// Run mechanism failed and run is no longer active. Retry may or may not work.
+	// Run mechanism failed in an expected way and is no longer running.
 	FAILED
 	// User requested that the run be killed.
 	ABORTED
 	// Operation timed out and was killed.
 	TIMEDOUT
-	// Invalid or error'd request. Original runner state not affected. Retry may work after mutation.
+	// Request rejected due to unexpected failure.
 	BADREQUEST
 )
 
 func (p RunState) IsDone() bool {
-	return p == COMPLETE || p == FAILED || p == ABORTED || p == TIMEDOUT
+	return p == COMPLETE || p == FAILED || p == ABORTED || p == TIMEDOUT || p == UNKNOWN || p == BADREQUEST
 }
 
 func (p RunState) String() string {
@@ -59,11 +63,6 @@ func (p RunState) String() string {
 	}
 }
 
-type LogTags struct {
-	JobID  string
-	TaskID string
-}
-
 // Returned by the coordinator when a run request is made.
 type RunStatus struct {
 	RunID RunID
@@ -81,85 +80,85 @@ type RunStatus struct {
 	// Only valid if State == (FAILED || BADREQUEST)
 	Error string
 
-	LogTags
+	tags.LogTags
 }
 
 func (p RunStatus) String() string {
-	s := fmt.Sprintf("RunStatus -- RunID:%s # SnapshotID:%s # State:%s # JobID:%s # TaskID:%s",
-		p.RunID, p.SnapshotID, p.State, p.JobID, p.TaskID)
+	s := fmt.Sprintf("RunStatus -- RunID: %s # SnapshotID: %s # State: %s # JobID: %s # TaskID: %s # Tag: %s",
+		p.RunID, p.SnapshotID, p.State, p.JobID, p.TaskID, p.Tag)
 
 	if p.State == COMPLETE {
-		s += fmt.Sprintf(" # ExitCode:%d", p.ExitCode)
+		s += fmt.Sprintf(" # ExitCode: %d", p.ExitCode)
 	}
 	if p.State == FAILED || p.State == BADREQUEST {
-		s += fmt.Sprintf(" # Error:%s", p.Error)
+		s += fmt.Sprintf(" # Error: %s", p.Error)
 	}
-	s += fmt.Sprintf(" # Stdout:%s # Stderr:%s", p.StdoutRef, p.StderrRef)
+	s += fmt.Sprintf(" # Stdout: %s # Stderr: %s", p.StdoutRef, p.StderrRef)
 
 	return s
 }
 
 // Helper functions to create RunStatus
 
-func AbortStatus(runID RunID, IDs LogTags) (r RunStatus) {
+func AbortStatus(runID RunID, tags tags.LogTags) (r RunStatus) {
 	r.RunID = runID
 	r.State = ABORTED
-	r.LogTags = IDs
+	r.LogTags = tags
 	return r
 }
 
-func TimeoutStatus(runID RunID, IDs LogTags) (r RunStatus) {
+func TimeoutStatus(runID RunID, tags tags.LogTags) (r RunStatus) {
 	r.RunID = runID
 	r.State = TIMEDOUT
-	r.LogTags = IDs
+	r.LogTags = tags
 	return r
 }
 
-func ErrorStatus(runID RunID, err error, IDs LogTags) (r RunStatus) {
+func FailedStatus(runID RunID, err error, tags tags.LogTags) (r RunStatus) {
 	r.RunID = runID
 	r.State = FAILED
 	r.Error = err.Error()
-	r.LogTags = IDs
+	r.LogTags = tags
 	return r
 }
 
-func BadRequestStatus(runID RunID, err error, IDs LogTags) (r RunStatus) {
+func BadRequestStatus(runID RunID, err error, tags tags.LogTags) (r RunStatus) {
 	r.RunID = runID
 	r.State = BADREQUEST
 	r.Error = err.Error()
-	r.LogTags = IDs
+	r.LogTags = tags
 	return r
 }
 
-func PendingStatus(runID RunID, IDs LogTags) (r RunStatus) {
+func PendingStatus(runID RunID, tags tags.LogTags) (r RunStatus) {
 	r.RunID = runID
 	r.State = PENDING
-	r.LogTags = IDs
+	r.LogTags = tags
 	return r
 }
 
-func RunningStatus(runID RunID, stdoutRef, stderrRef string, IDs LogTags) (r RunStatus) {
+func RunningStatus(runID RunID, stdoutRef, stderrRef string, tags tags.LogTags) (r RunStatus) {
 	r.RunID = runID
 	r.State = RUNNING
 	r.StdoutRef = stdoutRef
 	r.StderrRef = stderrRef
-	r.LogTags = IDs
+	r.LogTags = tags
 	return r
 }
 
-func CompleteStatus(runID RunID, snapshotID string, exitCode int, IDs LogTags) (r RunStatus) {
+func CompleteStatus(runID RunID, snapshotID string, exitCode int, tags tags.LogTags) (r RunStatus) {
 	r.RunID = runID
 	r.State = COMPLETE
 	r.SnapshotID = snapshotID
 	r.ExitCode = exitCode
-	r.LogTags = IDs
+	r.LogTags = tags
 	return r
 }
 
-func PreparingStatus(runID RunID, IDs LogTags) (r RunStatus) {
+func PreparingStatus(runID RunID, tags tags.LogTags) (r RunStatus) {
 	r.RunID = runID
 	r.State = PREPARING
-	r.LogTags = IDs
+	r.LogTags = tags
 	return r
 }
 

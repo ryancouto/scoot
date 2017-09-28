@@ -3,10 +3,10 @@ enum Status {
   PENDING = 1      # Run scheduled but not yet started.
   RUNNING = 2      # Run is happening.
   COMPLETE = 3     # Succeeded or failed yielding an exit code. Only state with an exit code.
-  FAILED = 4       # Run mechanism failed and is no longer running. Retry may or may not work.
+  FAILED = 4       # Run mechanism failed in an expected way and is no longer running.
   ABORTED = 5      # User requested that the run be killed.
   TIMEDOUT = 6     # Run timed out and was killed.
-  BADREQUEST = 7   # Invalid or error'd request. Retry may or may not work.
+  BADREQUEST = 7   # Request rejected due to unexpected failure.
 }
 
 // Note, each worker has its own runId space which is unrelated to any external ids.
@@ -20,6 +20,7 @@ struct RunStatus {
   7: optional string snapshotId
   8: optional string jobId
   9: optional string taskId
+  10: optional string tag
 }
 
 // TODO: add useful load information when it comes time to have multiple runs.
@@ -36,6 +37,7 @@ struct RunCommand {
   4: optional i32 timeoutMs           # Kill the job if it hasn't completed in time (Status.TIMEOUT).
   5: optional string jobId
   6: optional string taskId
+  7: optional string tag
 }
 
 //TODO: add a method to kill the worker if we can articulate unrecoverable issues.

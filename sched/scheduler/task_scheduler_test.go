@@ -7,12 +7,12 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/luci/go-render/render"
-	"github.com/scootdev/scoot/cloud/cluster"
-	"github.com/scootdev/scoot/common/stats"
-	"github.com/scootdev/scoot/runner"
-	"github.com/scootdev/scoot/saga/sagalogs"
-	"github.com/scootdev/scoot/sched"
-	"github.com/scootdev/scoot/tests/testhelpers"
+	"github.com/twitter/scoot/cloud/cluster"
+	"github.com/twitter/scoot/common/stats"
+	"github.com/twitter/scoot/runner"
+	"github.com/twitter/scoot/saga/sagalogs"
+	"github.com/twitter/scoot/sched"
+	"github.com/twitter/scoot/tests/testhelpers"
 )
 
 func Test_TaskAssignment_NoNodesAvailable(t *testing.T) {
@@ -20,7 +20,7 @@ func Test_TaskAssignment_NoNodesAvailable(t *testing.T) {
 	jobAsBytes, _ := job.Serialize()
 
 	saga, _ := sagalogs.MakeInMemorySagaCoordinator().MakeSaga(job.Id, jobAsBytes)
-	js := newJobState(&job, saga)
+	js := newJobState(&job, saga, nil)
 
 	// create a test cluster with no nodes
 	testCluster := makeTestCluster()
@@ -50,7 +50,7 @@ func Test_TaskAssignments_TasksScheduled(t *testing.T) {
 	jobAsBytes, _ := job.Serialize()
 
 	saga, _ := sagalogs.MakeInMemorySagaCoordinator().MakeSaga(job.Id, jobAsBytes)
-	js := newJobState(&job, saga)
+	js := newJobState(&job, saga, nil)
 	req := map[string][]*jobState{"": []*jobState{js}}
 
 	// create a test cluster with no nodes
@@ -158,9 +158,7 @@ func Test_TaskAssignments_RequestorBatching(t *testing.T) {
 
 	req := map[string][]*jobState{"": js}
 	config := &SchedulerConfig{
-		NumConfiguredNodes:      len(nodes), // GetNodeScaleFactor() is (NumConfiguredNodes / SoftMaxSchedulableTasks)
-		SoftMaxSchedulableTasks: 10,         // We want numTasks*GetNodeScaleFactor()==3 to define a specific order for scheduling.
-		LargeJobSoftMaxNodes:    DefaultLargeJobSoftMaxNodes,
+		SoftMaxSchedulableTasks: 10, // We want numTasks*GetNodeScaleFactor()==3 to define a specific order for scheduling.
 	}
 
 	assignments, _ := getTaskAssignments(cs, js, req, config, nil)
@@ -293,9 +291,7 @@ func Test_TaskAssignments_PriorityStages(t *testing.T) {
 
 	req := map[string][]*jobState{"": js}
 	config := &SchedulerConfig{
-		NumConfiguredNodes:      len(nodes), // GetNodeScaleFactor() is (NumConfiguredNodes / SoftMaxSchedulableTasks)
-		SoftMaxSchedulableTasks: 50,         // We want numTasks*GetNodeScaleFactor()==2 to define a specific order for scheduling.
-		LargeJobSoftMaxNodes:    DefaultLargeJobSoftMaxNodes,
+		SoftMaxSchedulableTasks: 50, // We want numTasks*GetNodeScaleFactor()==2 to define a specific order for scheduling.
 	}
 
 	// Check for all 10 P3 tasks
@@ -315,6 +311,7 @@ func Test_TaskAssignments_PriorityStages(t *testing.T) {
 	}
 
 	// Check for 5 P2, 3 P1, and 2 P0 tasks
+	NodeScaleAdjustment = 0 //Reset this global setting to simplify testing here.
 	assignments, _ = getTaskAssignments(cs, js, req, config, nil)
 	if len(assignments) != 10 {
 		t.Fatalf("Expected ten tasks to be assigned, got %v", len(assignments))

@@ -3,9 +3,13 @@ package workerapi
 import (
 	"time"
 
-	"github.com/scootdev/scoot/common/thrifthelpers"
-	"github.com/scootdev/scoot/runner"
-	"github.com/scootdev/scoot/workerapi/gen-go/worker"
+	log "github.com/sirupsen/logrus"
+
+	"github.com/twitter/scoot/common/log/helpers"
+	"github.com/twitter/scoot/common/log/tags"
+	"github.com/twitter/scoot/common/thrifthelpers"
+	"github.com/twitter/scoot/runner"
+	"github.com/twitter/scoot/workerapi/gen-go/worker"
 )
 
 //
@@ -39,12 +43,14 @@ func DomainWorkerStatusToThrift(domain WorkerStatus) *worker.WorkerStatus {
 }
 
 func ThriftRunCommandToDomain(thrift *worker.RunCommand) *runner.Command {
+	log.Info("ThriftRunCommandToDomain %v", thrift)
 	argv := make([]string, 0)
 	env := make(map[string]string)
 	timeout := time.Duration(0)
 	snapshotID := ""
 	jobID := ""
 	taskID := ""
+	tag := ""
 	if thrift.Argv != nil {
 		argv = thrift.Argv
 	}
@@ -63,7 +69,20 @@ func ThriftRunCommandToDomain(thrift *worker.RunCommand) *runner.Command {
 	if thrift.JobId != nil {
 		jobID = *thrift.JobId
 	}
-	return &runner.Command{Argv: argv, EnvVars: env, Timeout: timeout, SnapshotID: snapshotID, JobID: jobID, TaskID: taskID}
+	if thrift.Tag != nil {
+		tag = *thrift.Tag
+	}
+	return &runner.Command{
+		Argv:       argv,
+		EnvVars:    env,
+		Timeout:    timeout,
+		SnapshotID: snapshotID,
+		LogTags: tags.LogTags{
+			JobID:  jobID,
+			TaskID: taskID,
+			Tag:    tag,
+		},
+	}
 }
 
 func DomainRunCommandToThrift(domain *runner.Command) *worker.RunCommand {
@@ -78,6 +97,8 @@ func DomainRunCommandToThrift(domain *runner.Command) *worker.RunCommand {
 	thrift.JobId = &jobID
 	taskID := domain.TaskID
 	thrift.TaskId = &taskID
+	tag := domain.Tag
+	thrift.Tag = &tag
 	return thrift
 }
 
@@ -123,14 +144,10 @@ func ThriftRunStatusToDomain(thrift *worker.RunStatus) runner.RunStatus {
 	if thrift.TaskId != nil {
 		domain.TaskID = *thrift.TaskId
 	}
-	return domain
-}
-
-func copyString(s string) *string {
-	if s == "" {
-		return nil
+	if thrift.Tag != nil {
+		domain.Tag = *thrift.Tag
 	}
-	return &s
+	return domain
 }
 
 func DomainRunStatusToThrift(domain runner.RunStatus) *worker.RunStatus {
@@ -154,14 +171,15 @@ func DomainRunStatusToThrift(domain runner.RunStatus) *worker.RunStatus {
 	case runner.BADREQUEST:
 		thrift.Status = worker.Status_BADREQUEST
 	}
-	thrift.OutUri = copyString(domain.StdoutRef)
-	thrift.ErrUri = copyString(domain.StderrRef)
-	thrift.Error = copyString(domain.Error)
+	thrift.OutUri = helpers.CopyStringToPointer(domain.StdoutRef)
+	thrift.ErrUri = helpers.CopyStringToPointer(domain.StderrRef)
+	thrift.Error = helpers.CopyStringToPointer(domain.Error)
 	exitCode := int32(domain.ExitCode)
 	thrift.ExitCode = &exitCode
-	thrift.SnapshotId = copyString(domain.SnapshotID)
-	thrift.JobId = copyString(domain.JobID)
-	thrift.TaskId = copyString(domain.TaskID)
+	thrift.SnapshotId = helpers.CopyStringToPointer(domain.SnapshotID)
+	thrift.JobId = helpers.CopyStringToPointer(domain.JobID)
+	thrift.TaskId = helpers.CopyStringToPointer(domain.TaskID)
+	thrift.Tag = helpers.CopyStringToPointer(domain.Tag)
 	return thrift
 }
 

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/scootdev/scoot/runner"
+	"github.com/twitter/scoot/runner"
 )
 
 // polling.go: turns a StatusQueryNower into a StatusQuerier by polling
@@ -43,8 +43,7 @@ func (r *PollingStatusQuerier) Query(q runner.Query, wait runner.Wait) ([]runner
 			return nil, service, errors.New("Aborted")
 		default:
 		}
-		st, svc, err := r.QueryNow(q)
-		service = svc
+		st, service, err := r.QueryNow(q)
 		if err != nil || len(st) > 0 {
 			return st, service, err
 		}

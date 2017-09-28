@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"github.com/leanovate/gopter"
-	"github.com/scootdev/scoot/runner"
-	"github.com/scootdev/scoot/tests/testhelpers"
+
+	"github.com/twitter/scoot/common/log/tags"
+	"github.com/twitter/scoot/runner"
+	"github.com/twitter/scoot/tests/testhelpers"
 )
 
 // Generates a Random Job with the specified Id and number of Tasks
@@ -51,15 +53,17 @@ func GenJobDef(numTasks int) JobDefinition {
 // Generates a Random Job Definition, using the supplied Rand
 // with the specified number of Tasks
 func GenRandomJobDef(numTasks int, rng *rand.Rand) *JobDefinition {
+	tag := fmt.Sprintf("tag:%s", testhelpers.GenRandomAlphaNumericString(rng))
 	jobDef := JobDefinition{
 		JobType: fmt.Sprintf("jobType:%s", testhelpers.GenRandomAlphaNumericString(rng)),
 		Tasks:   make([]TaskDefinition, 0),
+		Tag:     tag,
 	}
 
 	// Generate tasks
 	seen := map[string]bool{}
 	for i := 0; i < numTasks; i++ {
-		task := GenRandomTask(rng)
+		task := GenRandomTask(rng, tag)
 		for {
 			if _, ok := seen[task.TaskID]; ok {
 				task.TaskID = fmt.Sprintf("taskName:%s", testhelpers.GenRandomAlphaNumericString(rng))
@@ -77,11 +81,11 @@ func GenRandomJobDef(numTasks int, rng *rand.Rand) *JobDefinition {
 // Generates a Random TaskDefinition
 func GenTask() TaskDefinition {
 	rand := testhelpers.NewRand()
-	return GenRandomTask(rand)
+	return GenRandomTask(rand, fmt.Sprintf("tag:%s", testhelpers.GenRandomAlphaNumericString(rand)))
 }
 
 // Generates a Random TaskDefinition, using the supplied Rand
-func GenRandomTask(rng *rand.Rand) TaskDefinition {
+func GenRandomTask(rng *rand.Rand, tag string) TaskDefinition {
 	snapshotId := fmt.Sprintf("snapShotId:%s", testhelpers.GenRandomAlphaNumericString(rng))
 	taskId := fmt.Sprintf("taskId:%s", testhelpers.GenRandomAlphaNumericString(rng))
 	numArgs := rng.Intn(5)
@@ -97,14 +101,16 @@ func GenRandomTask(rng *rand.Rand) TaskDefinition {
 		envVarsMap[fmt.Sprintf("env%d", j)] = testhelpers.GenRandomAlphaNumericString(rng)
 	}
 
-	// multiply by second to get a reasonable timeout instead of <1 us (which is too short for the command to succeed)
-	timeout := time.Duration(rng.Int63n(1000)) * time.Second
+	timeout := 10 * time.Second //Arbitrary value to support pausing sim execer tests.
 	cmd := runner.Command{
 		SnapshotID: snapshotId,
 		Argv:       args,
 		EnvVars:    envVarsMap,
 		Timeout:    timeout,
-		TaskID:     taskId,
+		LogTags: tags.LogTags{
+			TaskID: taskId,
+			Tag:    tag,
+		},
 	}
 
 	return TaskDefinition{cmd}

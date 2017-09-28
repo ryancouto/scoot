@@ -1,7 +1,11 @@
+// +build daemon_test
+
+// daemon_test is disabled in travis-ci
+
 package server_test
 
 import (
-	"github.com/scootdev/scoot/daemon/server"
+	"github.com/twitter/scoot/daemon/server"
 	"io/ioutil"
 	"os"
 	"path"

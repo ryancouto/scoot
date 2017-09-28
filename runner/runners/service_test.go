@@ -5,7 +5,8 @@ import (
 	"runtime/debug"
 	"testing"
 
-	"github.com/scootdev/scoot/runner"
+	"github.com/twitter/scoot/common/log/tags"
+	"github.com/twitter/scoot/runner"
 )
 
 // Utilities for testing a runner.Service (single_test.go and queue_test.go)
@@ -16,7 +17,7 @@ func teardown(t *testing.T) {
 	}
 }
 
-var t runner.LogTags
+var t tags.LogTags
 
 func complete(exitCode int) runner.RunStatus {
 	return runner.CompleteStatus(runner.RunID(""), "", exitCode, t)
@@ -31,7 +32,7 @@ func running() runner.RunStatus {
 }
 
 func failed(errorText string) runner.RunStatus {
-	return runner.ErrorStatus(runner.RunID(""), fmt.Errorf(errorText), t)
+	return runner.FailedStatus(runner.RunID(""), fmt.Errorf(errorText), t)
 }
 
 func aborted() runner.RunStatus {

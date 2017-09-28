@@ -4,20 +4,22 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	uuid "github.com/nu7hatch/gouuid"
+	log "github.com/sirupsen/logrus"
 
-	"github.com/scootdev/scoot/async"
-	"github.com/scootdev/scoot/cloud/cluster"
-	"github.com/scootdev/scoot/common/log/hooks"
-	"github.com/scootdev/scoot/common/stats"
-	"github.com/scootdev/scoot/runner"
-	"github.com/scootdev/scoot/saga"
-	"github.com/scootdev/scoot/sched"
-	"github.com/scootdev/scoot/workerapi"
+	"github.com/twitter/scoot/async"
+	"github.com/twitter/scoot/cloud/cluster"
+	"github.com/twitter/scoot/common/log/hooks"
+	"github.com/twitter/scoot/common/log/tags"
+	"github.com/twitter/scoot/common/stats"
+	"github.com/twitter/scoot/runner"
+	"github.com/twitter/scoot/saga"
+	"github.com/twitter/scoot/sched"
+	"github.com/twitter/scoot/workerapi"
 )
 
 // Used to get proper logging from tests...
@@ -34,6 +36,8 @@ func init() {
 }
 
 // Provide defaults for config settings that should never be uninitialized/zero.
+// These are reasonable defaults for a small cluster of around a couple dozen nodes.
+// FIXME(jschiller): overwrite SoftMaxSchedulableTasks at runtime if peak load is higher.
 
 // Nothing should run forever by default, use this timeout as a fallback.
 const DefaultDefaultTaskTimeout = 30 * time.Minute
@@ -43,19 +47,16 @@ const DefaultDefaultTaskTimeout = 30 * time.Minute
 const DefaultTaskTimeoutOverhead = 15 * time.Second
 
 // Number of different requestors that can run jobs at any given time.
-const DefaultMaxRequestors = 100
+const DefaultMaxRequestors = 10
 
-// Number of jobs any single requestor can have.
+// Number of jobs any single requestor can have (to prevent spamming, not for scheduler fairness).
 const DefaultMaxJobsPerRequestor = 100
 
-// Expected number of nodes. Should roughly correspond with the actual number of healthy nodes.
-const DefaultNumConfiguredNodes = 100
-
 // A reasonable maximum number of tasks we'd expect to queue.
-const DefaultSoftMaxSchedulableTasks = 10000
+const DefaultSoftMaxSchedulableTasks = 1000
 
-// The maximum number of nodes required to run a 'large' job in an acceptable amount of time.
-const DefaultLargeJobSoftMaxNodes = 50
+// Increase the NodeScaleFactor by a percentage defined by 1 + (Priority * NodeScaleAdjustment)
+var NodeScaleAdjustment = 1.0
 
 // Scheduler Config variables read at initialization
 // MaxRetriesPerTask - the number of times to retry a failing task before
@@ -87,14 +88,26 @@ type SchedulerConfig struct {
 	ReadyFnBackoff          time.Duration
 	MaxRequestors           int
 	MaxJobsPerRequestor     int
-	NumConfiguredNodes      int
 	SoftMaxSchedulableTasks int
-	LargeJobSoftMaxNodes    int
 }
 
 // Used to calculate how many tasks a job can run without adversely affecting other jobs.
-func (s *SchedulerConfig) GetNodeScaleFactor() float32 {
-	return float32(s.NumConfiguredNodes) / float32(s.SoftMaxSchedulableTasks)
+// We account for priority by increasing the scale factor by an appropriate percentage.
+//  ex: p=0:scale*=1, p=1:scale*=1.5, p=2:scale*=2
+func (s *SchedulerConfig) GetNodeScaleFactor(numNodes int, p sched.Priority) float32 {
+	sf := float32(numNodes) / float32(s.SoftMaxSchedulableTasks)
+	return sf * (1 + (float32(p) * float32(NodeScaleAdjustment)))
+}
+
+// Used to keep a running average of duration for a specific task.
+type averageDuration struct {
+	count    int64
+	duration time.Duration
+}
+
+func (ad averageDuration) update(d time.Duration) {
+	ad.count++
+	ad.duration = ad.duration + time.Duration(int64(d-ad.duration)/ad.count)
 }
 
 type RunnerFactory func(node cluster.Node) runner.Service
@@ -120,8 +133,9 @@ type statefulScheduler struct {
 
 	// Scheduler State
 	clusterState   *clusterState
-	inProgressJobs []*jobState            // ordered list of inprogress jobId to job.
-	requestorMap   map[string][]*jobState // map of requestor to all its jobs. Default requestor="" is ok.
+	inProgressJobs []*jobState                // ordered list of inprogress jobId to job.
+	requestorMap   map[string][]*jobState     // map of requestor to all its jobs. Default requestor="" is ok.
+	taskDurations  map[string]averageDuration // map of taskId to averageDuration (note: we unconditionally dereference this).
 
 	// stats
 	stat stats.StatsReceiver
@@ -177,13 +191,30 @@ func NewStatefulScheduler(
 		st, svc, err := run.StatusAll()
 		if err != nil || !svc.Initialized {
 			if svc.Error != nil {
-				log.Info("Received service err during init of new node: %v, err: %v", node, svc.Error)
+				log.WithFields(
+					log.Fields{
+						"node": node,
+						"err":  svc.Error,
+					}).Info("received service err during init of new node")
 				return false, 0
 			}
 			return false, config.ReadyFnBackoff
 		}
 		for _, s := range st {
-			log.Info("Aborting existing run on new node: ", node, s)
+			log.WithFields(
+				log.Fields{
+					"node":       node,
+					"runID":      s.RunID,
+					"state":      s.State,
+					"stdout":     s.StdoutRef,
+					"stderr":     s.StderrRef,
+					"snapshotID": s.SnapshotID,
+					"exitCode":   s.ExitCode,
+					"error":      s.Error,
+					"jobID":      s.JobID,
+					"taskID":     s.TaskID,
+					"tag":        s.Tag,
+				}).Info("Aborting existing run on new node")
 			run.Abort(s.RunID)
 		}
 		return true, 0
@@ -204,14 +235,8 @@ func NewStatefulScheduler(
 	if config.MaxJobsPerRequestor == 0 {
 		config.MaxJobsPerRequestor = DefaultMaxJobsPerRequestor
 	}
-	if config.NumConfiguredNodes == 0 {
-		config.NumConfiguredNodes = DefaultNumConfiguredNodes
-	}
 	if config.SoftMaxSchedulableTasks == 0 {
 		config.SoftMaxSchedulableTasks = DefaultSoftMaxSchedulableTasks
-	}
-	if config.LargeJobSoftMaxNodes == 0 {
-		config.LargeJobSoftMaxNodes = DefaultLargeJobSoftMaxNodes
 	}
 
 	sched := &statefulScheduler{
@@ -226,6 +251,7 @@ func NewStatefulScheduler(
 		clusterState:   newClusterState(initialCluster, clusterUpdates, nodeReadyFn, stat),
 		inProgressJobs: make([]*jobState, 0),
 		requestorMap:   make(map[string][]*jobState),
+		taskDurations:  make(map[string]averageDuration),
 		stat:           stat,
 	}
 
@@ -260,8 +286,14 @@ type jobAddedMsg struct {
 func (s *statefulScheduler) ScheduleJob(jobDef sched.JobDefinition) (string, error) {
 	defer s.stat.Latency(stats.SchedJobLatency_ms).Time().Stop() // TODO errata metric - remove if unused
 	s.stat.Counter(stats.SchedJobRequestsCounter).Inc(1)         // TODO errata metric - remove if unused
-	log.Infof("Job request: Requestor:%s, Tag:%s, Basis:%s, Priority:%d, numTasks: %d",
-		jobDef.Requestor, jobDef.Tag, jobDef.Basis, jobDef.Priority, len(jobDef.Tasks))
+	log.WithFields(
+		log.Fields{
+			"requestor": jobDef.Requestor,
+			"tag":       jobDef.Tag,
+			"basis":     jobDef.Basis,
+			"priority":  jobDef.Priority,
+			"numTasks":  len(jobDef.Tasks),
+		}).Info("New job request")
 
 	checkResultCh := make(chan error, 1)
 	s.checkJobCh <- jobCheckMsg{
@@ -270,7 +302,15 @@ func (s *statefulScheduler) ScheduleJob(jobDef sched.JobDefinition) (string, err
 	}
 	err := <-checkResultCh
 	if err != nil {
-		log.Infof("Rejected job request: %v -> %v", jobDef, err)
+		log.WithFields(
+			log.Fields{
+				"jobDef":    jobDef,
+				"requestor": jobDef.Requestor,
+				"tag":       jobDef.Tag,
+				"basis":     jobDef.Basis,
+				"priority":  jobDef.Priority,
+				"err":       err,
+			}).Error("Rejected job request")
 		return "", err
 	}
 
@@ -284,19 +324,37 @@ func (s *statefulScheduler) ScheduleJob(jobDef sched.JobDefinition) (string, err
 
 	asBytes, err := job.Serialize()
 	if err != nil {
-		log.Infof("Failed to serialize job request: %v -> %v", jobDef, err)
+		log.WithFields(
+			log.Fields{
+				"jobDef":    jobDef,
+				"requestor": jobDef.Requestor,
+				"tag":       jobDef.Tag,
+				"basis":     jobDef.Basis,
+				"priority":  jobDef.Priority,
+				"err":       err,
+			}).Error("Failed to serialize job request")
 		return "", err
 	}
 
 	// Log StartSaga Message
 	sagaObj, err := s.sagaCoord.MakeSaga(job.Id, asBytes)
 	if err != nil {
-		log.Infof("Failed to create saga for job request: %v -> %v", jobDef, err)
+		log.WithFields(
+			log.Fields{
+				"jobDef": jobDef,
+				"err":    err,
+				"tag":    jobDef.Tag,
+			}).Error("Failed to create saga for job request")
 		return "", err
 	}
-
-	log.Infof("Queueing job request: Requestor:%s, Tag:%s, Basis:%s, Priority:%d, numTasks: %d",
-		jobDef.Requestor, jobDef.Tag, jobDef.Basis, jobDef.Priority, len(jobDef.Tasks))
+	log.WithFields(
+		log.Fields{
+			"requestor": jobDef.Requestor,
+			"tag":       jobDef.Tag,
+			"basis":     jobDef.Basis,
+			"priority":  jobDef.Priority,
+			"numTasks":  len(jobDef.Tasks),
+		}).Info("Queueing job request")
 	s.stat.Counter(stats.SchedJobsCounter).Inc(1)
 	s.addJobCh <- jobAddedMsg{
 		job:  job,
@@ -308,8 +366,7 @@ func (s *statefulScheduler) ScheduleJob(jobDef sched.JobDefinition) (string, err
 
 // generates a jobId using a random uuid
 func generateJobId() string {
-
-	// uuid.NewV4() should never actually return an error the code uses
+	// uuid.NewV4() should never actually return an error. The code uses
 	// rand.Read Api to generate the uuid, which according to golang docs
 	// "Read always returns ... a nil error" https://golang.org/pkg/math/rand/#Read
 	for {
@@ -388,17 +445,28 @@ checkLoop:
 				}
 				if _, ok := s.requestorMap[checkJobMsg.jobDef.Requestor]; ok && err == nil {
 					// If we have an existing job with this requestor/tag combination, make sure we use its priority level.
-					// Not an error since we can consider priority to be a suggestion which we'll choose to ignore.
+					// Not an error since we can consider priority to be a suggestion which we'll handle contextually.
 					for _, js := range s.requestorMap[checkJobMsg.jobDef.Requestor] {
 						if js.Job.Def.Tag == checkJobMsg.jobDef.Tag &&
 							js.Job.Def.Basis != checkJobMsg.jobDef.Basis &&
 							js.Job.Def.Priority != checkJobMsg.jobDef.Priority {
 							m := checkJobMsg
-							log.Infof("Overriding job priority %d to match previous requestor/tag priority: "+
-								"Requestor:%s, Tag:%s, Basis:%s, Priority:%d, numTasks: %d",
-								js.Job.Def.Priority, m.jobDef.Requestor, m.jobDef.Tag, m.jobDef.Basis, m.jobDef.Priority, len(m.jobDef.Tasks))
+							log.WithFields(
+								log.Fields{
+									"requestor": m.jobDef.Requestor,
+									"tag":       m.jobDef.Tag,
+									"basis":     m.jobDef.Basis,
+									"priority":  m.jobDef.Priority,
+									"numTasks":  len(m.jobDef.Tasks),
+								}).Info("Overriding job priority to match previous requestor/tag priority")
 						}
 					}
+				} else if checkJobMsg.jobDef.Priority > sched.P1 {
+					// Priorities greater than 1 are disabled in job_state.go.
+					jd := checkJobMsg.jobDef
+					log.Infof("Overriding job priority %d to respect max priority of 1 (higher priority is untested and disabled)"+
+						"Requestor:%s, Tag:%s, Basis:%s, Priority:%d, numTasks: %d",
+						jd.Priority, jd.Requestor, jd.Tag, jd.Basis, jd.Priority, len(jd.Tasks))
 				}
 			}
 			checkJobMsg.resultCh <- err
@@ -414,17 +482,24 @@ addLoop:
 		select {
 		case newJobMsg := <-s.addJobCh:
 			receivedJob = true
-			js := newJobState(newJobMsg.job, newJobMsg.saga)
+			js := newJobState(newJobMsg.job, newJobMsg.saga, s.taskDurations)
 			s.inProgressJobs = append(s.inProgressJobs, js)
+
+			// TODO(jschiller): associate related tasks, i.e. task retries that decorate the taskId?
+			sort.Sort(sort.Reverse(taskStatesByDuration(js.Tasks)))
 
 			req := newJobMsg.job.Def.Requestor
 			if _, ok := s.requestorMap[req]; !ok {
 				s.requestorMap[req] = []*jobState{}
 			}
 			s.requestorMap[req] = append(s.requestorMap[req], js)
-
-			log.Infof("Created new Job: %s, requestor: %s, with %d tasks.",
-				newJobMsg.job.Id, req, len(newJobMsg.job.Def.Tasks))
+			log.WithFields(
+				log.Fields{
+					"jobID":    newJobMsg.job.Id,
+					"req":      req,
+					"numTasks": len(newJobMsg.job.Def.Tasks),
+					"tag":      newJobMsg.job.Def.Tag,
+				}).Info("Created new job")
 		default:
 			break addLoop
 		}
@@ -436,8 +511,13 @@ addLoop:
 			completed += job.TasksCompleted
 			running += job.TasksRunning
 		}
-		log.Infof("After adding jobs: tasks unscheduled: %d, running: %d, completed: %d, total: %d",
-			total-completed-running, running, completed, total)
+		log.WithFields(
+			log.Fields{
+				"unscheduledTasks": total - completed - running,
+				"runningTasks":     running,
+				"completedTasks":   completed,
+				"totalTasks":       total,
+			}).Info("Added jobs")
 	}
 }
 
@@ -491,7 +571,11 @@ func (s *statefulScheduler) checkForCompletedJobs() {
 				},
 				func(err error) {
 					if err == nil {
-						log.Infof("Job completed and logged: %v", j.Job.Id)
+						log.WithFields(
+							log.Fields{
+								"jobID": j.Job.Id,
+								"tag":   j.Job.Def.Tag,
+							}).Info("Job completed and logged")
 						// This job is fully processed remove from InProgressJobs
 						s.deleteJob(j.Job.Id)
 					} else {
@@ -499,7 +583,12 @@ func (s *statefulScheduler) checkForCompletedJobs() {
 						// EndSaga message on next scheduler loop
 						j.EndingSaga = false
 						s.stat.Counter(stats.SchedRetriedEndSagaCounter).Inc(1) // TODO errata metric - remove if unused
-						log.Infof("Job completed but failed to log: %v, %v", j.Job.Id, err)
+						log.WithFields(
+							log.Fields{
+								"jobID": j.Job.Id,
+								"err":   err,
+								"tag":   j.Job.Def.Tag,
+							}).Info("Job completed but failed to log")
 					}
 				})
 		}
@@ -517,10 +606,13 @@ func (s *statefulScheduler) scheduleTasks() {
 		// Set up variables for async functions & callback
 		task := ta.task
 		nodeSt := ta.nodeSt
-		jobId := task.JobId
-		taskId := task.TaskId
+		jobID := task.JobId
+		taskID := task.TaskId
+		tag := s.getJob(jobID).Job.Def.Tag
 		taskDef := task.Def
-		jobState := s.getJob(jobId)
+		taskDef.JobID = jobID
+		taskDef.Tag = tag
+		jobState := s.getJob(jobID)
 		sa := jobState.Saga
 		rs := s.runnerFactory(nodeSt.node)
 
@@ -534,16 +626,22 @@ func (s *statefulScheduler) scheduleTasks() {
 			flaky := false
 			preempted := true
 			rt.TaskRunner.Abort(endSagaTask)
-			msg := fmt.Sprintf("jobId:%s taskId:%s Preempted by jobId:%s taskId:%s", rt.JobId, rt.TaskId, jobId, taskId)
-			log.Infof(msg)
+			msg := fmt.Sprintf("jobId:%s taskId:%s Preempted by jobId:%s taskId:%s", rt.JobId, rt.TaskId, jobID, taskID)
+			log.Info(msg)
 			// Update jobState and clusterState here instead of in the async handler below.
 			s.getJob(rt.JobId).errorRunningTask(rt.TaskId, errors.New(msg), preempted)
 			s.clusterState.taskCompleted(nodeSt.node.Id(), flaky)
 		}
 
 		// Mark Task as Started in the cluster
-		s.clusterState.taskScheduled(nodeSt.node.Id(), jobId, taskId, taskDef.SnapshotID)
-		log.Infof("jobId:%s, taskId:%s, scheduled on node:%s\n", jobId, taskId, nodeSt.node)
+		s.clusterState.taskScheduled(nodeSt.node.Id(), jobID, taskID, taskDef.SnapshotID)
+		log.WithFields(
+			log.Fields{
+				"jobID":  jobID,
+				"taskID": taskID,
+				"node":   nodeSt.node,
+				"tag":    tag,
+			}).Info("Task scheduled")
 
 		tRunner := &taskRunner{
 			saga:   sa,
@@ -556,27 +654,46 @@ func (s *statefulScheduler) scheduleTasks() {
 			runnerRetryInterval:   s.config.RunnerRetryInterval,
 			markCompleteOnFailure: preventRetries,
 
-			jobId:  jobId,
-			taskId: taskId,
+			LogTags: tags.LogTags{
+				JobID:  jobID,
+				TaskID: taskID,
+				Tag:    tag,
+			},
+
 			task:   taskDef,
 			nodeSt: nodeSt,
 
 			abortCh:      make(chan bool, 1),
 			queryAbortCh: make(chan interface{}, 1),
+
+			startTime: time.Now(),
 		}
 
 		// mark the task as started in the jobState and record its taskRunner
-		jobState.taskStarted(taskId, tRunner)
+		jobState.taskStarted(taskID, tRunner)
 
 		s.asyncRunner.RunAsync(
 			tRunner.run,
 			func(err error) {
 				defer rs.Release()
+				// Update the average duration for this task so, for new jobs, we can schedule the likely long running tasks first.
+				if err == nil || err.(*taskError).st.State == runner.TIMEDOUT ||
+					(err.(*taskError).st.State == runner.COMPLETE && err.(*taskError).st.ExitCode == 0) {
+					s.taskDurations[taskID].update(time.Now().Sub(tRunner.startTime))
+				}
+
 				// Tasks from the same job or related jobs will never preempt each other,
 				//  so we only need to check jobId to determine preemption.
-				if nodeSt.runningJob != jobId {
-					log.Infof("Task preempted on node %s. jobId:%s taskId:%s --> jobId:%s taskId:%s. Skipping asyncRun cleanup",
-						nodeSt.node, jobId, taskId, nodeSt.runningJob, nodeSt.runningTask)
+				if nodeSt.runningJob != jobID {
+					log.WithFields(
+						log.Fields{
+							"node":        nodeSt.node,
+							"jobID":       jobID,
+							"taskID":      taskID,
+							"runningJob":  nodeSt.runningJob,
+							"runningTask": nodeSt.runningTask,
+							"tag":         tag,
+						}).Info("Task preempted")
 					return
 				}
 
@@ -597,50 +714,59 @@ func (s *statefulScheduler) scheduleTasks() {
 							msg = fmt.Sprintf("Error running task (quitting, hit max retries of %d):", s.config.MaxRetriesPerTask)
 							err = nil
 						} else {
-							jobState.errorRunningTask(taskId, err, preempted)
+							jobState.errorRunningTask(taskID, err, preempted)
 						}
 					}
-					log.WithFields(log.Fields{
-						"jobId":  jobId,
-						"taskId": taskId,
-						"err":    taskErr,
-						"cmd":    strings.Join(taskDef.Argv, " "),
-					}).Info(msg)
+					log.WithFields(
+						log.Fields{
+							"jobId":  jobID,
+							"taskId": taskID,
+							"err":    taskErr,
+							"cmd":    strings.Join(taskDef.Argv, " "),
+							"tag":    tag,
+						}).Info(msg)
 
 					// If the task completed succesfully but sagalog failed, start a goroutine to retry until it succeeds.
 					if taskErr.sagaErr != nil && taskErr.st.RunID != "" && taskErr.runnerErr == nil && taskErr.resultErr == nil {
-						log.WithFields(log.Fields{
-							"jobId":  jobId,
-							"taskId": taskId,
-						}).Info(msg, " -> starting goroutine to handle failed saga.EndTask. ")
+						log.WithFields(
+							log.Fields{
+								"jobId":  jobID,
+								"taskId": taskID,
+							}).Info(msg, " -> starting goroutine to handle failed saga.EndTask. ")
 						//TODO -this may results in closed channel panic due to sending endSaga to sagalog (below) before endTask
 						go func() {
 							for err := errors.New(""); err != nil; err = tRunner.logTaskStatus(&taskErr.st, saga.EndTask) {
 								time.Sleep(time.Second)
 							}
-							log.WithFields(log.Fields{
-								"jobId":  jobId,
-								"taskId": taskId,
-							}).Info(msg, " -> finished goroutine to handle failed saga.EndTask. ")
+							log.WithFields(
+								log.Fields{
+									"jobId":  jobID,
+									"taskId": taskID,
+									"tag":    tag,
+								}).Info(msg, " -> finished goroutine to handle failed saga.EndTask. ")
 						}()
 					}
 				}
 				if err == nil || aborted {
-					log.WithFields(log.Fields{
-						"jobId":   jobId,
-						"taskId":  taskId,
-						"command": strings.Join(taskDef.Argv, " "),
-					}).Info("Ending task.")
-					jobState.taskCompleted(taskId, true)
+					log.WithFields(
+						log.Fields{
+							"jobId":   jobID,
+							"taskId":  taskID,
+							"command": strings.Join(taskDef.Argv, " "),
+							"tag":     tag,
+						}).Info("Ending task.")
+					jobState.taskCompleted(taskID, true)
 				}
 
 				// update cluster state that this node is now free and if we consider the runner to be flaky.
-				log.WithFields(log.Fields{
-					"jobId":  jobId,
-					"taskId": taskId,
-					"node":   nodeSt.node,
-					"flaky":  flaky,
-				}).Info("Freeing node, removed job.")
+				log.WithFields(
+					log.Fields{
+						"jobId":  jobID,
+						"taskId": taskID,
+						"node":   nodeSt.node,
+						"flaky":  flaky,
+						"tag":    tag,
+					}).Info("Freeing node, removed job.")
 				s.clusterState.taskCompleted(nodeSt.node.Id(), flaky)
 
 				total := 0
@@ -651,12 +777,23 @@ func (s *statefulScheduler) scheduleTasks() {
 					completed += job.TasksCompleted
 					running += job.TasksRunning
 				}
-				log.WithFields(log.Fields{
-					"jobId": jobId,
-				}).Info(" #running:", jobState.TasksRunning, " #completed:", jobState.TasksCompleted,
-					" #total:", len(jobState.Tasks), " isdone:", (jobState.TasksCompleted == len(jobState.Tasks)))
-				log.Info("Jobs task summary -> running:", running, " completed:", completed,
-					" total:", total, " alldone:", (completed == total))
+				log.WithFields(
+					log.Fields{
+						"jobId":     jobID,
+						"running":   jobState.TasksRunning,
+						"completed": jobState.TasksCompleted,
+						"total":     len(jobState.Tasks),
+						"isdone":    jobState.TasksCompleted == len(jobState.Tasks),
+						"tag":       tag,
+					}).Info()
+				log.WithFields(
+					log.Fields{
+						"running":   running,
+						"completed": completed,
+						"total":     total,
+						"alldone":   completed == total,
+						"tag":       tag,
+					}).Info("Jobs task summary")
 			})
 	}
 }
@@ -665,13 +802,14 @@ func (s *statefulScheduler) scheduleTasks() {
 Put the kill request on channel that is processed by the main
 scheduler loop, and wait for the response
 */
-func (s *statefulScheduler) KillJob(jobId string) error {
+func (s *statefulScheduler) KillJob(jobID string) error {
 
-	log.WithFields(log.Fields{
-		"jobId": jobId,
-	}).Info("KillJob requested")
+	log.WithFields(
+		log.Fields{
+			"jobID": jobID,
+		}).Info("KillJob requested")
 	responseCh := make(chan error, 1)
-	req := jobKillRequest{jobId: jobId, responseCh: responseCh}
+	req := jobKillRequest{jobId: jobID, responseCh: responseCh}
 	s.killJobCh <- req
 
 	return <-req.responseCh
@@ -720,7 +858,7 @@ func (s *statefulScheduler) killJobs() {
 				task.TaskRunner.Abort(true)
 				inProgress++
 			} else if task.Status == sched.NotStarted {
-				st := runner.AbortStatus("", runner.LogTags{JobID: jobState.Job.Id, TaskID: task.TaskId})
+				st := runner.AbortStatus("", tags.LogTags{JobID: jobState.Job.Id, TaskID: task.TaskId})
 				statusAsBytes, err := workerapi.SerializeProcessStatus(st)
 				if err != nil {
 					s.stat.Counter(stats.SchedFailedTaskSerializeCounter).Inc(1) // TODO errata metric - remove if unused
@@ -732,11 +870,13 @@ func (s *statefulScheduler) killJobs() {
 				notStarted++
 			}
 		}
-		log.WithFields(log.Fields{
-			"jobId":           req.jobId,
-			"tasksNotStarted": notStarted,
-			"tasksInProgress": inProgress,
-		}).Info("killJobs handler")
+		log.WithFields(
+			log.Fields{
+				"jobID":           req.jobId,
+				"tasksNotStarted": notStarted,
+				"tasksInProgress": inProgress,
+				"tag":             s.getJob(req.jobId).Job.Def.Tag,
+			}).Info("killJobs handler")
 
 		req.responseCh <- nil
 	}
